@@ -1,11 +1,31 @@
 //hosting
+require('events').EventEmitter.defaultMaxListeners = 100;
+const ms = require('ms');
+const giveawayEmbed = require('./commands/start-givaway')
+const auHelp = require('./tags/au-help')
+const dotenv = require("dotenv");
 const express = require('express');
 const app = express();
 const port = 3000;
+const roleClaim = require('./role-claim')
+const { MongoClient } = require('mongodb')
+const MongoDBProvider = require('commando-provider-mongo')
+const path = require('path')
+const { CommandoClient } = require('discord.js-commando');
+const advancedPolls = require('./advanced-polls')
+const config = require('./config.json')
+const loadCommands = require('./commands/load-commands')
+const commandBase = require('./commands/command-base')
+const loadFeatures = require('./features/load-features')
+const mongo = require('./util/mongo')
 
-app.get('/', (req, res) => res.send('Hello World!'));
+const modLogs = require('./features/features/mod-logs')
 
+app.get('/', (req, res) => res.send('Hello UptimeRobot Thank you!'));
 app.listen(port, () => console.log(`Example app listening at com.sun.net.httpserver.HttpServer:${port}`));
+
+
+
 //Giveaway bot
 /*
 If you want to make discord-economy guild based you have to use message.author.id + message.guild.id as ID for example:
@@ -18,56 +38,299 @@ This will create a unique ID for each guild member
 //Requiring Packages
 const Discord = require('discord.js'); //This can also be discord.js-commando or other node based packages!
 const eco = require("discord-economy");
- 
 //Create the bot client
-const client = new Discord.Client();
+//const client = new Discord.Client()
+const client = new CommandoClient({
+  owner: '737486185466691585',
+  commandPrefix: config.prefix,
+  invite: 'https://discord.gg/TKKJCSX',
+})
+
+client.on('ready', async () => {
+  console.log('The client is ready!')
+
+  await mongo()
+
+  client.registry
+    .registerGroups([
+      ['misc', 'misc commands'],
+      ['moderation', 'moderation commands'],
+      ['economy', 'Commands for the economy system'],
+      ['giveaway', 'Commands to manage giveaways'],
+      ['games', 'Commands to handle games'],
+      ['thanks', 'Commands to help thank people'],
+      ['suggestions', 'Commands regarding suggestions'],
+    ])
+    .registerDefaults()
+    .registerCommandsIn(path.join(__dirname, 'cmds'))
+
+  commandBase.loadPrefixes(client)
+  loadFeatures(client)
+  loadCommands(client)
+
+  modLogs(client)
+})
+
+const bot = client;
+const guild = client.guilds.cache.get("761678800609607700");
 const cooldowns = new Discord.Collection();
 client.on('ready', () => {
         console.log(`${client.user.username} is up and running!`);
     })
- 
+    
+
 //Set the prefix and token of the bot.
+client.on('ready', () => {
+  /*client.user.setActivity(`for E help| ${client.guilds.cache.size} servers` , {type: "WATCHING"}); */
+    client.user.setStatus('online')
+    client.user.setActivity(`P | epicpeacebot.xyz | ${client.guilds.cache.size} servers`, {
+  type: "STREAMING",
+  url: "https://twitch.tv/anongreyhat"
+
+});
+});
+client.on('ready', async () => {
+ await mongo().then((mongoose) => {
+    try {
+      console.log('Connected to mongo!')
+    } finally {
+      mongoose.connection.close()
+    }
+  })
+})
+client.on('ready', () => {
+  console.log('The client is ready!')
+  advancedPolls(client)
+  roleClaim(client)
+
+})
 const settings = {
-  prefix: 'E ',
+  prefix: 'P ',
   token: process.env.token
 }
- 
-//Whenever someone types a message this gets activated.
-//(If you use 'await' in your functions make sure you put async here)
+fs = require('fs')
+var data;
+fs.readFile('codes.txt', 'utf8', function (err,rawData) {
+  if (err) {
+    return console.log(err);
+  }
+  data = rawData.split('\n');
+});
 
+function randomInt (low, high) {
+    return Math.floor(Math.random() * (high - low) + low);
+}
+function getRandomLine(){
+  return data[randomInt(0,data.length)];
+}
+
+
+client.on('ready', () => {
+  console.log('I am ready!');
+});
+var randomColor = Math.floor(Math.random()*16777215).toString(16);
+const randomPuppy = require('random-puppy')
+module.exports.run = async (bot, message, args) => {
+    const subReddits = ["meme", "me_irl", "dankmeme"]
+    const random = subReddits[Math.floor(Math.random() * subReddits.length)];
+    const img = await randomPuppy(random);
+    const memeEm = new Discord.MessageEmbed()
+    .setImage( img )
+    .setTitle(`From /r/${random}`)
+    .setURL(`http://reddit.com/${random}`)
+    .setColor(randomColor)
+
+}
+module.exports.config = {
+    name: "meme",
+    description: "",
+    usage: "E meme",
+    accessableby: "everyone",
+    aliases: []
+}
+client.on("message", function(message) {
+  if (!message.guild) return;
+
+  // if the message content starts with "!ban"
+  if (message.content.startsWith('E ban')) {
+    // Assuming we mention someone in the message, this will return the user
+    // Read more about mentions over at https://discord.js.org/#/docs/main/master/class/MessageMentions
+    const user = message.mentions.users.first();
+    // If we have a user mentioned
+    if (user) {
+      // Now we get the member from the user
+      const member = message.guild.member(user);
+      // If the member is in the guild
+      if (member) {
+        /**
+         * Ban the member
+         * Make sure you run this on a member, not a user!
+         * There are big differences between a user and a member
+         * Read more about what ban options there are over at
+         * https://discord.js.org/#/docs/main/master/class/GuildMember?scrollTo=ban
+         */
+        member
+          .ban({
+            reason: 'They were bad!',
+          })
+          .then(() => {
+            // We let the message author know we were able to ban the person
+            message.reply(`Successfully banned ${user.tag}`);
+          })
+          .catch(err => {
+            // An error happened
+            // This is generally due to the bot not being able to ban the member,
+            // either due to missing permissions or role hierarchy
+            message.reply('I was unable to ban the member');
+            // Log the error
+            console.error(err);
+          });
+      } else {
+        // The mentioned user isn't in this guild
+        message.reply("That user isn't in this guild!");
+      }
+    } else {
+      // Otherwise, if no user was mentioned
+      message.reply("You didn't mention the user to ban!");
+    }
+  }
+})
+
+  let userApplications = {}
+
+  client.on("message", function(message) {
+    if (message.author.equals(client.user)) return;
+
+    let authorId = message.author.id;
+
+    if (message.content === "E apply") {
+        console.log(`Apply begin for authorId ${authorId}`);
+        // User is not already in a registration process
+        if (!(authorId in userApplications)) {
+            userApplications[authorId] = { "step" : 1}
+
+            message.author.send("```We need to ask some questions so  we can know a litte bit about yourself```");
+            message.author.send("```Application Started - Type '#Cancel' to cancel the application```");
+            message.author.send("```Question 1: name#tag?```");
+        }
+
+    } else {
+
+        if (message.channel.type === "dm" && authorId in userApplications) {
+            let authorApplication = userApplications[authorId];
+
+            if (authorApplication.step == 1 ) {
+                authorApplication.answer1 = message.content;
+                message.author.send("```Question 2: Age?```");
+                authorApplication.step ++;
+            }
+            else if (authorApplication.step == 2) {
+                authorApplication.answer2 = message.content;
+                message.author.send("```Question 3: Timezone? NA, AU, EU, NZ, or Other? (If other, describe your timezone)```");
+                authorApplication.step ++;
+            }
+            else if (authorApplication.step == 3) {
+                authorApplication.answer3 = message.content;
+                message.author.send("```Question 4: Role wanted?```");
+                authorApplication.step ++;
+            }
+
+            else if (authorApplication.step == 4) {
+                authorApplication.answer4 = message.content;
+                message.author.send("```Thanks for your registration. PeaceAnarch will get to you Type E apply to register again```");
+                //before deleting, you can send the answers to a specific channel by ID
+                client.channels.cache.get("765372452238131261")
+                  .send(`${message.author.tag}\n${authorApplication.answer1}\n${authorApplication.answer2}\n${authorApplication.answer3}\n${authorApplication.answer4}`);
+                delete userApplications[authorId];
+            }
+        }
+    }
+  });
+
+client.on('message', message => {
+  // Ignore messages that aren't from a guild
+  
+  if (!message.guild) return;
+
+  // If the message content starts with "!kick"
+  if (message.content.startsWith('E kick')) {
+    // Assuming we mention someone in the message, this will return the user
+    // Read more about mentions over at https://discord.js.org/#/docs/main/master/class/MessageMentions
+    const user = message.mentions.users.first();
+    // If we have a user mentioned
+    if (user) {
+      // Now we get the member from the user
+      const member = message.guild.member(user);
+      // If the member is in the guild
+      if (member) {
+        /**
+         * Kick the member
+         * Make sure you run this on a member, not a user!
+         * There are big differences between a user and a member
+         */
+        member
+          .kick('Optional reason that will display in the audit logs')
+          .then(() => {
+            // We let the message author know we were able to kick the person
+            message.reply(`Successfully kicked ${user.tag}`);
+          })
+          .catch(err => {
+            // An error happened
+            // This is generally due to the bot not being able to kick the member,
+            // either due to missing permissions or role hierarchy
+            message.reply('I was unable to kick the member');
+            // Log the error
+            console.error(err);
+          });
+      } else {
+        // The mentioned user isn't in this guild
+        message.reply("That user isn't in this guild!");
+      }
+      // Otherwise, if no user was mentioned
+    } else {
+      message.reply("You didn't mention the user to kick!");
+    }
+  }
+});
    
 client.on('message', msg => {
+  
    if (msg.content === `${settings.prefix}ping`) {
     
     var ping = Date.now() - msg.createdTimestamp + " ms";
     msg.channel.send("Your (local add-on) ping is `" + `${Date.now() - msg.createdTimestamp}` + " ms`");
 }})
 client.on('message', async message => {
+   
   const MOD = message.member;
   const help = new Discord.MessageEmbed()
-	.setColor('#ADD8E6')
-	.setTitle('Help')
-	.setDescription(`
-  -------info--------
-  E help - this pops up
-  E balance - shows your coins
-  E leaderboard - shows top players
-  E avatar - shows your avatar
-  -------currency--------
-  E daily - claim daily 100 coins
-  -------issues---------
-  E transfer - having issues 
-  E coinfilp - having issues
-  E dice - having issues
-  E slots - having issues 
-  E work - having issues
-  ------owner only------
-  E own-add - adds coins to owner
-  ------admin only-------
-  E delete - deletes user for db
- `)
-	.setTimestamp()
-	.setFooter('creator of bot PeaceAnarch#7569')
+      .setTitle('Help')
+      .setDescription(`
+      **Current Prefix** E(space)
+      -------gen--------
+      {prefix}nitro - generates random nitro code
+      -------info--------
+       {prefix}help - this pops up  
+        {prefix}balance - shows your coins
+       {prefix}leaderboard - shows top players  
+        {prefix}avatar - shows your avatar 
+         -------currency-------
+        {prefix}daily - claim daily 100 coins
+        -------issues---------
+       {prefix}transfer - having issues
+       {prefix}coinfilp - having issues  
+        {prefix}dice - having issues  
+       {prefix}slots - having issues   
+       {prefix}work - having issues  
+        ------owner only------  
+      {prefix}own-add - adds coins to owner  
+        ------admin only-------  
+       {prefix}delete - deletes user for db  
+        {prefix} ban - bans user  
+        {prefix}kick - kicks user`)
+      .setColor('B0E0E6')
+      .setAuthor('PeaceAnarch#2020', 'https://dsc.bio/ITSFlopItTimeYT', 'https://cdn.discordapp.com/avatars/737486185466691585/a_af8b375379e38059b62e5f3cbe2e33bb.gif')
+    .setFooter('created by: PeaceAnarch#2020')
  
   //This reads the first part of your message behind your prefix to see which command you want to use.
   var command = message.content.toLowerCase().slice(settings.prefix.length).split(' ')[0];
@@ -88,31 +351,110 @@ if (timestamps.has(message.author.id)) {
   //If the message does not start with your prefix return.
   //If the user that types a message is a bot account return.
   if (!message.content.startsWith(settings.prefix) || message.author.bot) return;
- 
-  if (command === 'balance') {
- 
-    var output = await eco.FetchBalance(message.author.id)
-    message.channel.send(`Hey ${message.author.tag}! You own ${output.balance} coins.`);
-  }
-  if (command === 'help'){
-    message.channel.send(help)
-  }
-  if (command === 'prune') {
-		const amount = parseInt(args[0]) + 1;
+  if (command === 'gstart') {
+    if(!message.member.hasPermission('MANAGE_MESSAGES') && !message.member.roles.cache.some((r) => r.name === "Giveaways")){
+        return message.channel.send(':x: You need to have the manage messages permissions to start giveaways.');
+    }
 
-		if (isNaN(amount)) {
-			return message.reply('that doesn\'t seem to be a valid number.');
-		} else if (amount <= 1 || amount > 100) {
-			return message.reply('you need to input a number between 1 and 99.');
-		}
+    // Giveaway channel
+    let giveawayChannel = message.mentions.channels.first();
+    // If no channel is mentionned
+    if(!giveawayChannel){
+        return message.channel.send(':x: You have to mention a valid channel!');
+    }
 
-		message.channel.bulkDelete(amount, true).catch(err => {
-			console.error(err);
-			message.channel.send('there was an error trying to prune messages in this channel!');
-		});
+    // Giveaway duration
+    let giveawayDuration = args[1];
+    // If the duration isn't valid
+    if(!giveawayDuration || isNaN(ms(giveawayDuration))){
+        return message.channel.send(':x: You have to specify a valid duration!');
+    }
 
-	// ...
+    // Number of winners
+    let giveawayNumberWinners = args[2];
+    // If the specified number of winners is not a number
+    if(isNaN(giveawayNumberWinners) || (parseInt(giveawayNumberWinners) <= 0)){
+        return message.channel.send(':x: You have to specify a valid number of winners!');
+    }
+
+    // Giveaway prize
+    let giveawayPrize = args.slice(3).join(' ');
+    // If no prize is specified
+    if(!giveawayPrize){
+        return message.channel.send(':x: You have to specify a valid prize!');
+    }
+
+    // Start the giveaway
+    client.giveawaysManager.start(giveawayChannel, {
+        // The giveaway duration
+        time: ms(giveawayDuration),
+        // The giveaway prize
+        prize: giveawayPrize,
+        // The giveaway winner count
+        winnerCount: giveawayNumberWinners,
+        // Who hosts this giveaway
+        hostedBy: client.config.hostedBy ? message.author : null,
+        // Messages
+        messages: {
+            giveaway: (client.config.everyoneMention ? "@everyone\n\n" : "")+"🎉🎉 **GIVEAWAY** 🎉🎉",
+            giveawayEnded: (client.config.everyoneMention ? "@everyone\n\n" : "")+"🎉🎉 **GIVEAWAY ENDED** 🎉🎉",
+            timeRemaining: "Time remaining: **{duration}**!",
+            inviteToParticipate: "React with 🎉 to participate!",
+            winMessage: "Congratulations, {winners}! You won **{prize}**!",
+            embedFooter: "Giveaways",
+            noWinner: "Giveaway cancelled, no valid participations.",
+            hostedBy: "Hosted by: {user}",
+            winners: "winner(s)",
+            endedAt: "Ended at",
+            units: {
+                seconds: "seconds",
+                minutes: "minutes",
+                hours: "hours",
+                days: "days",
+                pluralS: false // Not needed, because units end with a S so it will automatically removed if the unit value is lower than 2
+            }
+        }
+    });
+
+    message.channel.send(`Giveaway started in ${giveawayChannel}!`);
+
+
 }
+  if (command === 'auhelp') {
+    message.channel.send(auHelp.embed)
+  }
+if (command === 'nitro') {
+  //message.reply(interval)
+  message.reply(`down for now if you need help go to support`)
+  message.react('❌')
+}
+if (command === 'meme') {
+  const LINE = client.guildEmoji.guild("766390715357593600")
+  message.channel.send(`
+   ${LINE}${LINE}${LINE}${LINE}
+   sorry doesnt work right now
+   ${LINE}${LINE}${LINE}${LINE}
+   `)
+
+}
+if (command === 'dmbecker') {
+//69356400764203833 09beckerboy
+} 
+if (command === 'create') {
+  var output = await eco.Daily(message.author.id)
+    //output.updated will tell you if the user already claimed his/her daily yes or no.
+ 
+    if (output.updated) {
+ 
+      var profile = await eco.AddToBalance(message.author.id, 1)
+      message.reply(`You claimed your daily coins successfully! You now own ${profile.newbalance} coins.`);
+ 
+    } else {
+      message.react('❌')
+      message.reply('nope')
+    }
+ 
+  }
   if (command === 'daily') {
  
     var output = await eco.Daily(message.author.id)
@@ -216,7 +558,6 @@ if (timestamps.has(message.author.id)) {
     message.reply(`You ${gamble.output}! New balance: ${gamble.newbalance}`)
  
   }
- 
   if (command === 'dice') {
  
     var roll = args[0] //Should be a number between 1 and 6
@@ -293,9 +634,15 @@ var profile = await eco.AddToBalance(message.author.id, 10000)
 }
   }
   if (command == 'own-add') {
-    var profile = await eco.AddToBalance(message.author.id, 100000000000000000)
+    if (message.author.id === '737486185466691585') {
+	// ...
+	var profile = await eco.AddToBalance(message.author.id, 6969696968)
       message.reply(`You claimed your owner coins successfully! You now own ${profile.newbalance} coins.`);
-      ownerOnly: true
+}else{
+  message.react('❌')
+  message.reply(`cannot use not a founder
+  bettcha didnt think id catch your ass`)
+  }
 } 
 });
 
